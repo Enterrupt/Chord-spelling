@@ -81,7 +81,6 @@
         /* Game Screen */
         #game-screen, #summary-screen { display: none; }
 
-        /* Fix to allow clicking on disabled note buttons when waiting for next question */
         #game-screen.waiting .note-btn:disabled {
             pointer-events: none;
         }
@@ -196,6 +195,7 @@
         .quality-buttons {
             display: flex;
             justify-content: center;
+            flex-wrap: wrap;
             gap: 10px;
             margin-top: 15px;
         }
@@ -209,6 +209,18 @@
         .quality-btn:hover {
             border-color: var(--primary);
             background-color: #f8f9fa;
+        }
+        
+        .quality-btn.disabled-quality {
+            background-color: #ecf0f1;
+            color: #95a5a6;
+            border-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .quality-btn.disabled-quality:hover {
+            background-color: #ecf0f1;
+            border-color: #bdc3c7;
         }
         
         .feedback-text {
@@ -254,8 +266,8 @@
         <div class="setup-group">
             <label for="difficulty">Difficulty:</label>
             <select id="difficulty">
-                <option value="beginner">Beginner (Alphabetical Input)</option>
-                <option value="intermediate">Intermediate (Randomized Input)</option>
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate (Includes Chord Quality check)</option>
             </select>
         </div>
 
@@ -280,7 +292,7 @@
             <span id="score-percent">Score: 0%</span>
         </div>
 
-        <h3>Given Notes (Scrambled)</h3>
+        <h3 id="given-notes-header">Given Notes (Scrambled)</h3>
         <div class="given-notes-box" id="given-notes">C E G</div>
 
         <h3>Your Spelling</h3>
@@ -294,11 +306,8 @@
 
         <div id="quality-container">
             <h3>Excellent! Now, what is the quality of this chord?</h3>
-            <div class="quality-buttons">
-                <button class="quality-btn" onclick="checkQuality('Major')">Major</button>
-                <button class="quality-btn" onclick="checkQuality('Minor')">Minor</button>
-                <button class="quality-btn" onclick="checkQuality('Diminished')">Diminished</button>
-            </div>
+            <div class="quality-buttons" id="quality-buttons">
+                </div>
         </div>
 
         <div class="controls">
@@ -324,10 +333,11 @@
         mode: 1, difficulty: 'beginner', maxQ: 10, currentQ: 1,
         correct: 0, incorrect: 0, firstAttempt: true,
         currentChord: null, userAnswer: [], previousRoot: '',
-        waitingForNext: false 
+        waitingForNext: false, scrambledNotes: [],
+        questionQueue: []
     };
 
-    // Strict spelling engine to dynamically generate perfect chords
+    // Strict spelling engine
     function spellChord(rootName, intervals) {
         const letters = ['C','D','E','F','G','A','B'];
         const values = [0, 2, 4, 5, 7, 9, 11];
@@ -427,7 +437,6 @@
 
     // --- Global Click Listener for "Click Anywhere to Continue" ---
     document.addEventListener('click', (e) => {
-        // Only trigger if we are waiting, AND the user didn't explicitly click the Exit button
         if (state.waitingForNext && !e.target.closest('.btn-exit')) {
             state.waitingForNext = false;
             nextQuestion();
@@ -445,6 +454,7 @@
         state.correct = 0;
         state.incorrect = 0;
         state.waitingForNext = false;
+        state.questionQueue = []; // Reset deck
         
         state.mode = parseInt(document.getElementById('exercise-mode').value);
         state.difficulty = document.getElementById('difficulty').value;
@@ -470,9 +480,8 @@
         state.firstAttempt = true;
         state.waitingForNext = false;
         
-        // Remove the CSS class that allows clicking through buttons
+        document.getElementById('given-notes-header').innerText = state.difficulty === 'beginner' ? 'Given Notes' : 'Given Notes (Scrambled)';
         document.getElementById('game-screen').classList.remove('waiting');
-        
         document.getElementById('btn-clear').style.display = 'block';
         document.getElementById('quality-container').style.display = 'none';
         document.getElementById('feedback').innerText = '';
@@ -481,10 +490,14 @@
 
         let pool = state.mode === 1 ? ex1Pool : (state.mode === 2 ? ex2Pool : (state.mode === 3 ? ex3Pool : ex4Pool));
         
-        let chordObj;
-        do {
-            chordObj = pool[Math.floor(Math.random() * pool.length)];
-        } while (chordObj.notes[0] === state.previousRoot && pool.length > 1);
+        if (state.questionQueue.length === 0) {
+            state.questionQueue = shuffle([...pool]);
+            if (state.previousRoot === state.questionQueue[0].notes[0] && state.questionQueue.length > 1) {
+                state.questionQueue.push(state.questionQueue.shift());
+            }
+        }
+        
+        let chordObj = state.questionQueue.shift();
         
         state.currentChord = chordObj;
         state.previousRoot = chordObj.notes[0];
@@ -492,7 +505,9 @@
         let scrambled;
         do { scrambled = shuffle(chordObj.notes); } 
         while (scrambled.join(',') === chordObj.notes.join(','));
-        document.getElementById('given-notes').innerText = scrambled.join('   -   ');
+        
+        state.scrambledNotes = scrambled;
+        document.getElementById('given-notes').innerText = state.scrambledNotes.join('   -   ');
 
         renderInterface();
     }
@@ -510,12 +525,7 @@
         btnDiv.innerHTML = '';
         document.getElementById('input-buttons').style.display = 'flex';
         
-        let buttonsToRender = [...state.currentChord.notes];
-        if (state.difficulty === 'beginner') {
-            buttonsToRender.sort(); 
-        } else {
-            buttonsToRender = shuffle(buttonsToRender);
-        }
+        let buttonsToRender = [...state.scrambledNotes];
 
         buttonsToRender.forEach((note, index) => {
             let btn = document.createElement('button');
@@ -554,11 +564,36 @@
             <span style="color: var(--${colorClass});">${message}</span>
             <span class="click-continue-pulse">(Click anywhere to continue)</span>
         `;
-        
-        // Add class so CSS lets clicks pass through disabled buttons
         document.getElementById('game-screen').classList.add('waiting');
-        
         setTimeout(() => { state.waitingForNext = true; }, 50);
+    }
+
+    function showQualityPrompt() {
+        document.getElementById('feedback').innerText = "Correct! Great spelling.";
+        document.getElementById('feedback').style.color = 'var(--success)';
+        
+        document.getElementById('input-buttons').style.display = 'none';
+        document.getElementById('quality-container').style.display = 'block';
+        
+        const qButtonsDiv = document.getElementById('quality-buttons');
+        qButtonsDiv.innerHTML = ''; 
+        
+        let qualityOptions = [];
+        if (state.mode === 1 || state.mode === 3) {
+            qualityOptions = ['Major', 'Minor', 'Diminished'];
+        } else if (state.mode === 2) {
+            qualityOptions = ['Major 7th', 'Minor 7th', 'Dominant 7th', 'Half-Diminished 7th'];
+        } else if (state.mode === 4) {
+            qualityOptions = ['Major 7th', 'Minor 7th', 'Dominant 7th', 'Half-Diminished 7th', 'Fully-Diminished 7th'];
+        }
+
+        qualityOptions.forEach(opt => {
+            let btn = document.createElement('button');
+            btn.className = 'quality-btn';
+            btn.innerText = opt;
+            btn.onclick = (e) => checkQuality(opt, e.target);
+            qButtonsDiv.appendChild(btn);
+        });
     }
 
     function checkAnswer() {
@@ -566,21 +601,18 @@
         const slots = document.getElementById('answer-slots').children;
 
         if (isCorrect) {
-            for (let slot of slots) slot.className = 'slot success';
+            Array.from(slots).forEach(slot => slot.className = 'slot success');
             document.getElementById('btn-clear').style.display = 'none';
             
             if (state.firstAttempt) state.correct++;
 
-            if (state.mode === 3 && state.difficulty === 'intermediate') {
-                document.getElementById('feedback').innerText = "Correct! Great spelling.";
-                document.getElementById('feedback').style.color = 'var(--success)';
-                document.getElementById('quality-container').style.display = 'block';
-                document.getElementById('input-buttons').style.display = 'none';
+            if (state.difficulty === 'intermediate') {
+                showQualityPrompt();
             } else {
                 promptToContinue("Correct! Great spelling.", "success");
             }
         } else {
-            for (let slot of slots) slot.className = 'slot error';
+            Array.from(slots).forEach(slot => slot.className = 'slot error');
             document.getElementById('feedback').innerText = "Incorrect order. Click 'Clear Entry' and try again.";
             document.getElementById('feedback').style.color = 'var(--danger)';
             if (state.firstAttempt) {
@@ -591,15 +623,7 @@
         updateScorecard();
     }
 
-    function clearAnswer() {
-        state.userAnswer = [];
-        updateSlots();
-        const btns = document.getElementById('input-buttons').children;
-        for (let btn of btns) btn.disabled = false;
-        document.getElementById('feedback').innerText = '';
-    }
-
-    function checkQuality(selectedQuality) {
+    function checkQuality(selectedQuality, btnElement) {
         if (selectedQuality === state.currentChord.quality) {
             document.getElementById('quality-container').style.display = 'none';
             document.getElementById('input-buttons').style.display = 'flex';
@@ -607,9 +631,35 @@
         } else {
             document.getElementById('feedback').innerText = `Incorrect quality. Try again!`;
             document.getElementById('feedback').style.color = 'var(--danger)';
+            
+            btnElement.disabled = true;
+            btnElement.classList.add('disabled-quality');
+            
             state.incorrect++; 
             updateScorecard();
         }
+    }
+
+    // --- The Bulletproof Clear Answer Fix ---
+    window.clearAnswer = function() {
+        // 1. Reset user state array
+        state.userAnswer = [];
+        
+        // 2. Explicitly clear all styling and text from the visual slots
+        const slots = document.querySelectorAll('.slot');
+        slots.forEach(slot => {
+            slot.innerText = '';
+            slot.className = 'slot'; // completely removes 'error' or 'filled' classes
+        });
+        
+        // 3. Re-enable the note buttons explicitly using querySelectorAll 
+        const noteBtns = document.querySelectorAll('.note-btn');
+        noteBtns.forEach(btn => {
+            btn.disabled = false;
+        });
+        
+        // 4. Wipe any existing feedback messages
+        document.getElementById('feedback').innerText = '';
     }
 
     function nextQuestion() {
