@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chord Root & Spelling Drill</title>
+    <style>
+        :root {
+            --primary: #4a90e2;
+            --primary-hover: #357abd;
+            --success: #2ecc71;
+            --danger: #e74c3c;
+            --bg: #f5f7fa;
+            --card-bg: #ffffff;
+            --text: #333333;
+            --border: #dcdde1;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            max-width: 800px;
+            width: 100%;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            padding: 30px;
+            text-align: center;
+        }
+
+        h1 {
+            color: var(--primary);
+            margin-top: 0;
+        }
+
+        /* Setup Screen */
+        .setup-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .setup-group label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        select, input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            font-size: 16px;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-weight: bold;
+        }
+
+        button:hover { background-color: var(--primary-hover); }
+        button:disabled { background-color: var(--border); cursor: not-allowed; }
+
+        .btn-start { width: 100%; font-size: 18px; margin-top: 10px; }
+
+        /* Game Screen */
+        #game-screen, #summary-screen { display: none; }
+
+        /* Fix to allow clicking on disabled note buttons when waiting for next question */
+        #game-screen.waiting .note-btn:disabled {
+            pointer-events: none;
+        }
+
+        .scorecard {
+            display: flex;
+            justify-content: space-between;
+            background-color: var(--bg);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .given-notes-box {
+            font-size: 24px;
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #fff3cd;
+            border: 2px solid #ffeeba;
+            border-radius: 8px;
+            letter-spacing: 2px;
+        }
+
+        .answer-slots {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            min-height: 50px;
+        }
+
+        .slot {
+            width: 60px;
+            height: 60px;
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            background-color: var(--bg);
+            transition: all 0.2s;
+        }
+
+        .slot.filled {
+            border-style: solid;
+            border-color: var(--primary);
+            background-color: #eaf3fc;
+            color: var(--primary);
+        }
+
+        .slot.error {
+            border-color: var(--danger);
+            background-color: #fdeaea;
+            color: var(--danger);
+        }
+
+        .slot.success {
+            border-color: var(--success);
+            background-color: #eafaf1;
+            color: var(--success);
+        }
+
+        .input-buttons {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .note-btn {
+            width: 70px;
+            height: 70px;
+            font-size: 22px;
+            background-color: white;
+            color: var(--text);
+            border: 2px solid var(--border);
+        }
+
+        .note-btn:hover:not(:disabled) {
+            border-color: var(--primary);
+            color: var(--primary);
+            background-color: #f8f9fa;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .btn-clear { background-color: var(--danger); }
+        .btn-clear:hover { background-color: #c0392b; }
+
+        .btn-exit { background-color: #7f8c8d; position: relative; z-index: 10; }
+        .btn-exit:hover { background-color: #636e72; }
+
+        /* Quality Follow-up Modal styles */
+        #quality-container {
+            display: none;
+            background-color: #eafaf1;
+            border: 2px solid var(--success);
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .quality-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .quality-btn {
+            background-color: white;
+            color: var(--text);
+            border: 2px solid var(--border);
+        }
+        
+        .quality-btn:hover {
+            border-color: var(--primary);
+            background-color: #f8f9fa;
+        }
+        
+        .feedback-text {
+            font-weight: bold;
+            margin-top: 10px;
+            min-height: 48px;
+        }
+
+        .click-continue-pulse {
+            display: block;
+            margin-top: 8px;
+            font-size: 0.85em;
+            color: #7f8c8d;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <div id="setup-screen">
+        <h1>Chord Spelling Drill</h1>
+        <p>Unscramble the notes to spell the chord in root position (stacked thirds).</p>
+        
+        <div class="setup-group">
+            <label for="exercise-mode">Exercise Mode:</label>
+            <select id="exercise-mode">
+                <option value="1">1. Triads in C Major</option>
+                <option value="2">2. 7th Chords in C Major</option>
+                <option value="3">3. Triads with Accidentals (Maj, Min, Dim)</option>
+                <option value="4">4. 7th Chords with Accidentals (M7, 7, m7, m7b5, dim7)</option>
+            </select>
+        </div>
+
+        <div class="setup-group">
+            <label for="difficulty">Difficulty:</label>
+            <select id="difficulty">
+                <option value="beginner">Beginner (Alphabetical Input)</option>
+                <option value="intermediate">Intermediate (Randomized Input)</option>
+            </select>
+        </div>
+
+        <div class="setup-group">
+            <label for="num-questions">Number of Questions:</label>
+            <select id="num-questions">
+                <option value="10">10 Questions</option>
+                <option value="20">20 Questions</option>
+                <option value="custom">Custom...</option>
+            </select>
+            <input type="number" id="custom-num" style="display:none; margin-top:10px;" min="1" max="100" value="15">
+        </div>
+
+        <button class="btn-start" onclick="startGame()">Start Drill</button>
+    </div>
+
+    <div id="game-screen">
+        <div class="scorecard">
+            <span id="score-qnum">Question: 1 / 10</span>
+            <span id="score-correct" style="color: var(--success);">Correct: 0</span>
+            <span id="score-incorrect" style="color: var(--danger);">Incorrect: 0</span>
+            <span id="score-percent">Score: 0%</span>
+        </div>
+
+        <h3>Given Notes (Scrambled)</h3>
+        <div class="given-notes-box" id="given-notes">C E G</div>
+
+        <h3>Your Spelling</h3>
+        <div class="answer-slots" id="answer-slots">
+            </div>
+
+        <div class="input-buttons" id="input-buttons">
+            </div>
+
+        <div class="feedback-text" id="feedback"></div>
+
+        <div id="quality-container">
+            <h3>Excellent! Now, what is the quality of this chord?</h3>
+            <div class="quality-buttons">
+                <button class="quality-btn" onclick="checkQuality('Major')">Major</button>
+                <button class="quality-btn" onclick="checkQuality('Minor')">Minor</button>
+                <button class="quality-btn" onclick="checkQuality('Diminished')">Diminished</button>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn-clear" id="btn-clear" onclick="clearAnswer()">Clear Entry</button>
+            <button class="btn-exit" onclick="exitDrill()">Exit Drill</button>
+        </div>
+    </div>
+
+    <div id="summary-screen">
+        <h1>Drill Complete!</h1>
+        <h2>Final Score: <span id="final-percent">0</span>%</h2>
+        <p>Correct: <span id="final-correct">0</span></p>
+        <p>Incorrect: <span id="final-incorrect">0</span></p>
+        <br>
+        <button onclick="exitDrill()">Return to Menu</button>
+    </div>
+
+</div>
+
+<script>
+    // --- Data & State ---
+    let state = {
+        mode: 1, difficulty: 'beginner', maxQ: 10, currentQ: 1,
+        correct: 0, incorrect: 0, firstAttempt: true,
+        currentChord: null, userAnswer: [], previousRoot: '',
+        waitingForNext: false 
+    };
+
+    // Strict spelling engine to dynamically generate perfect chords
+    function spellChord(rootName, intervals) {
+        const letters = ['C','D','E','F','G','A','B'];
+        const values = [0, 2, 4, 5, 7, 9, 11];
+        
+        let baseLetter = rootName.charAt(0);
+        let rootAcc = rootName.slice(1);
+        let rootIdx = letters.indexOf(baseLetter);
+        
+        let rootVal = (values[rootIdx] + (rootAcc==='#'?1:(rootAcc==='b'?-1:0)) + 12) % 12;
+        let chord = [];
+
+        for (let i = 0; i < intervals.length; i++) {
+            let targetLetterIdx = (rootIdx + (i * 2)) % 7;
+            let targetLetter = letters[targetLetterIdx];
+            let naturalVal = values[targetLetterIdx];
+            let targetVal = (rootVal + intervals[i]) % 12;
+
+            let diff = (targetVal - naturalVal) % 12;
+            if (diff > 6) diff -= 12;
+            if (diff < -6) diff += 12;
+
+            let accStr = '';
+            if (diff === 1) accStr = '#';
+            else if (diff === 2) accStr = 'x';
+            else if (diff === -1) accStr = 'b';
+            else if (diff === -2) accStr = 'bb';
+
+            chord.push(targetLetter + accStr);
+        }
+        return chord;
+    }
+
+    // Build Exercise Data Pools
+    const ex1Pool = [
+        {notes: ['C','E','G'], quality: 'Major'}, {notes: ['D','F','A'], quality: 'Minor'},
+        {notes: ['E','G','B'], quality: 'Minor'}, {notes: ['F','A','C'], quality: 'Major'},
+        {notes: ['G','B','D'], quality: 'Major'}, {notes: ['A','C','E'], quality: 'Minor'},
+        {notes: ['B','D','F'], quality: 'Diminished'}
+    ];
+    
+    const ex2Pool = [
+        {notes: ['C','E','G','B'], quality: 'Major 7th'}, {notes: ['D','F','A','C'], quality: 'Minor 7th'},
+        {notes: ['E','G','B','D'], quality: 'Minor 7th'}, {notes: ['F','A','C','E'], quality: 'Major 7th'},
+        {notes: ['G','B','D','F'], quality: 'Dominant 7th'}, {notes: ['A','C','E','G'], quality: 'Minor 7th'},
+        {notes: ['B','D','F','A'], quality: 'Half-Diminished 7th'}
+    ];
+
+    let ex3Pool = [];
+    let ex4Pool = [];
+
+    function generateAdvancedPools() {
+        const roots = ['C','C#','Db','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
+        const triadQualities = [
+            {name: 'Major', ints: [0, 4, 7]}, {name: 'Minor', ints: [0, 3, 7]}, {name: 'Diminished', ints: [0, 3, 6]}
+        ];
+        const seventhQualities = [
+            {name: 'Major 7th', ints: [0, 4, 7, 11]}, {name: 'Dominant 7th', ints: [0, 4, 7, 10]},
+            {name: 'Minor 7th', ints: [0, 3, 7, 10]}, {name: 'Half-Diminished 7th', ints: [0, 3, 6, 10]},
+            {name: 'Fully-Diminished 7th', ints: [0, 3, 6, 9]}
+        ];
+
+        roots.forEach(r => {
+            triadQualities.forEach(q => {
+                let chord = spellChord(r, q.ints);
+                if (!chord.some(n => n.includes('x'))) {
+                    ex3Pool.push({notes: chord, quality: q.name, root: r});
+                }
+            });
+            seventhQualities.forEach(q => {
+                let chord = spellChord(r, q.ints);
+                if (!chord.some(n => n.includes('x'))) {
+                    ex4Pool.push({notes: chord, quality: q.name, root: r});
+                }
+            });
+        });
+    }
+    generateAdvancedPools();
+
+    // --- Helpers ---
+    function shuffle(array) {
+        let arr = [...array];
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+    }
+
+    function updateScorecard() {
+        document.getElementById('score-qnum').innerText = `Question: ${state.currentQ} / ${state.maxQ}`;
+        document.getElementById('score-correct').innerText = `Correct: ${state.correct}`;
+        document.getElementById('score-incorrect').innerText = `Incorrect: ${state.incorrect}`;
+        let total = state.correct + state.incorrect;
+        let percent = total === 0 ? 0 : Math.round((state.correct / total) * 100);
+        document.getElementById('score-percent').innerText = `Score: ${percent}%`;
+    }
+
+    // --- Global Click Listener for "Click Anywhere to Continue" ---
+    document.addEventListener('click', (e) => {
+        // Only trigger if we are waiting, AND the user didn't explicitly click the Exit button
+        if (state.waitingForNext && !e.target.closest('.btn-exit')) {
+            state.waitingForNext = false;
+            nextQuestion();
+        }
+    });
+
+    // --- Event Listeners for Setup ---
+    document.getElementById('num-questions').addEventListener('change', (e) => {
+        document.getElementById('custom-num').style.display = e.target.value === 'custom' ? 'block' : 'none';
+    });
+
+    // --- Core Logic ---
+    function startGame() {
+        state.currentQ = 1;
+        state.correct = 0;
+        state.incorrect = 0;
+        state.waitingForNext = false;
+        
+        state.mode = parseInt(document.getElementById('exercise-mode').value);
+        state.difficulty = document.getElementById('difficulty').value;
+        let qSelect = document.getElementById('num-questions').value;
+        state.maxQ = qSelect === 'custom' ? parseInt(document.getElementById('custom-num').value) : parseInt(qSelect);
+        
+        document.getElementById('setup-screen').style.display = 'none';
+        document.getElementById('game-screen').style.display = 'block';
+        
+        loadQuestion();
+    }
+
+    function exitDrill() {
+        state.waitingForNext = false;
+        document.getElementById('game-screen').classList.remove('waiting');
+        document.getElementById('game-screen').style.display = 'none';
+        document.getElementById('summary-screen').style.display = 'none';
+        document.getElementById('setup-screen').style.display = 'block';
+    }
+
+    function loadQuestion() {
+        state.userAnswer = [];
+        state.firstAttempt = true;
+        state.waitingForNext = false;
+        
+        // Remove the CSS class that allows clicking through buttons
+        document.getElementById('game-screen').classList.remove('waiting');
+        
+        document.getElementById('btn-clear').style.display = 'block';
+        document.getElementById('quality-container').style.display = 'none';
+        document.getElementById('feedback').innerText = '';
+        
+        updateScorecard();
+
+        let pool = state.mode === 1 ? ex1Pool : (state.mode === 2 ? ex2Pool : (state.mode === 3 ? ex3Pool : ex4Pool));
+        
+        let chordObj;
+        do {
+            chordObj = pool[Math.floor(Math.random() * pool.length)];
+        } while (chordObj.notes[0] === state.previousRoot && pool.length > 1);
+        
+        state.currentChord = chordObj;
+        state.previousRoot = chordObj.notes[0];
+
+        let scrambled;
+        do { scrambled = shuffle(chordObj.notes); } 
+        while (scrambled.join(',') === chordObj.notes.join(','));
+        document.getElementById('given-notes').innerText = scrambled.join('   -   ');
+
+        renderInterface();
+    }
+
+    function renderInterface() {
+        const slotsDiv = document.getElementById('answer-slots');
+        slotsDiv.innerHTML = '';
+        state.currentChord.notes.forEach(() => {
+            let div = document.createElement('div');
+            div.className = 'slot';
+            slotsDiv.appendChild(div);
+        });
+
+        const btnDiv = document.getElementById('input-buttons');
+        btnDiv.innerHTML = '';
+        document.getElementById('input-buttons').style.display = 'flex';
+        
+        let buttonsToRender = [...state.currentChord.notes];
+        if (state.difficulty === 'beginner') {
+            buttonsToRender.sort(); 
+        } else {
+            buttonsToRender = shuffle(buttonsToRender);
+        }
+
+        buttonsToRender.forEach((note, index) => {
+            let btn = document.createElement('button');
+            btn.className = 'note-btn';
+            btn.innerText = note;
+            btn.dataset.originalNote = note;
+            btn.dataset.btnId = index;
+            btn.onclick = () => handleNoteClick(btn);
+            btnDiv.appendChild(btn);
+        });
+    }
+
+    function handleNoteClick(btn) {
+        if (state.userAnswer.length >= state.currentChord.notes.length) return;
+        
+        state.userAnswer.push(btn.dataset.originalNote);
+        btn.disabled = true;
+        
+        updateSlots();
+
+        if (state.userAnswer.length === state.currentChord.notes.length) {
+            checkAnswer();
+        }
+    }
+
+    function updateSlots() {
+        const slots = document.getElementById('answer-slots').children;
+        for (let i = 0; i < slots.length; i++) {
+            slots[i].innerText = state.userAnswer[i] || '';
+            slots[i].className = 'slot ' + (state.userAnswer[i] ? 'filled' : '');
+        }
+    }
+
+    function promptToContinue(message, colorClass) {
+        document.getElementById('feedback').innerHTML = `
+            <span style="color: var(--${colorClass});">${message}</span>
+            <span class="click-continue-pulse">(Click anywhere to continue)</span>
+        `;
+        
+        // Add class so CSS lets clicks pass through disabled buttons
+        document.getElementById('game-screen').classList.add('waiting');
+        
+        setTimeout(() => { state.waitingForNext = true; }, 50);
+    }
+
+    function checkAnswer() {
+        const isCorrect = state.userAnswer.join(',') === state.currentChord.notes.join(',');
+        const slots = document.getElementById('answer-slots').children;
+
+        if (isCorrect) {
+            for (let slot of slots) slot.className = 'slot success';
+            document.getElementById('btn-clear').style.display = 'none';
+            
+            if (state.firstAttempt) state.correct++;
+
+            if (state.mode === 3 && state.difficulty === 'intermediate') {
+                document.getElementById('feedback').innerText = "Correct! Great spelling.";
+                document.getElementById('feedback').style.color = 'var(--success)';
+                document.getElementById('quality-container').style.display = 'block';
+                document.getElementById('input-buttons').style.display = 'none';
+            } else {
+                promptToContinue("Correct! Great spelling.", "success");
+            }
+        } else {
+            for (let slot of slots) slot.className = 'slot error';
+            document.getElementById('feedback').innerText = "Incorrect order. Click 'Clear Entry' and try again.";
+            document.getElementById('feedback').style.color = 'var(--danger)';
+            if (state.firstAttempt) {
+                state.incorrect++;
+                state.firstAttempt = false;
+            }
+        }
+        updateScorecard();
+    }
+
+    function clearAnswer() {
+        state.userAnswer = [];
+        updateSlots();
+        const btns = document.getElementById('input-buttons').children;
+        for (let btn of btns) btn.disabled = false;
+        document.getElementById('feedback').innerText = '';
+    }
+
+    function checkQuality(selectedQuality) {
+        if (selectedQuality === state.currentChord.quality) {
+            document.getElementById('quality-container').style.display = 'none';
+            document.getElementById('input-buttons').style.display = 'flex';
+            promptToContinue(`Correct! It is a ${state.currentChord.quality} chord.`, "success");
+        } else {
+            document.getElementById('feedback').innerText = `Incorrect quality. Try again!`;
+            document.getElementById('feedback').style.color = 'var(--danger)';
+            state.incorrect++; 
+            updateScorecard();
+        }
+    }
+
+    function nextQuestion() {
+        if (state.currentQ >= state.maxQ) {
+            endGame();
+        } else {
+            state.currentQ++;
+            loadQuestion();
+        }
+    }
+
+    function endGame() {
+        document.getElementById('game-screen').style.display = 'none';
+        document.getElementById('summary-screen').style.display = 'block';
+        
+        let total = state.correct + state.incorrect;
+        let percent = total === 0 ? 0 : Math.round((state.correct / total) * 100);
+        
+        document.getElementById('final-correct').innerText = state.correct;
+        document.getElementById('final-incorrect').innerText = state.incorrect;
+        document.getElementById('final-percent').innerText = percent;
+    }
+
+</script>
+</body>
+</html>
