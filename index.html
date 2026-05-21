@@ -69,7 +69,7 @@
             font-size: 16px;
             border-radius: 6px;
             cursor: pointer;
-            transition: background-color 0.2s;
+            transition: background-color 0.2s, opacity 0.2s;
             font-weight: bold;
         }
 
@@ -81,7 +81,8 @@
         /* Game Screen */
         #game-screen, #summary-screen { display: none; }
 
-        #game-screen.waiting .note-btn:disabled {
+        /* Let clicks pass completely through all note buttons when waiting to proceed */
+        #game-screen.waiting .note-btn {
             pointer-events: none;
         }
 
@@ -163,10 +164,18 @@
             border: 2px solid var(--border);
         }
 
-        .note-btn:hover:not(:disabled) {
+        /* Hover effect only active if not selected */
+        .note-btn:hover:not(.selected) {
             border-color: var(--primary);
             color: var(--primary);
             background-color: #f8f9fa;
+        }
+
+        /* Selected state replaces the old disabled state so it remains clickable */
+        .note-btn.selected {
+            background-color: #ecf0f1;
+            color: #95a5a6;
+            border-color: #bdc3c7;
         }
 
         .controls {
@@ -539,15 +548,31 @@
     }
 
     function handleNoteClick(btn) {
-        if (state.userAnswer.length >= state.currentChord.notes.length) return;
+        const isSelected = btn.classList.contains('selected');
+        const note = btn.dataset.originalNote;
         
-        state.userAnswer.push(btn.dataset.originalNote);
-        btn.disabled = true;
-        
-        updateSlots();
+        if (isSelected) {
+            // UNSELECT LOGIC: Only allow unselecting if it is the LAST note entered
+            if (state.userAnswer.length > 0 && state.userAnswer[state.userAnswer.length - 1] === note) {
+                btn.classList.remove('selected');
+                state.userAnswer.pop(); // Remove specifically from the end
+                
+                document.getElementById('feedback').innerText = ''; // Wipe errors if correcting
+                updateSlots();
+            }
+            // If it is selected but NOT the last note, do nothing.
+        } else {
+            // SELECT LOGIC
+            if (state.userAnswer.length >= state.currentChord.notes.length) return;
+            
+            btn.classList.add('selected');
+            state.userAnswer.push(note);
+            
+            updateSlots();
 
-        if (state.userAnswer.length === state.currentChord.notes.length) {
-            checkAnswer();
+            if (state.userAnswer.length === state.currentChord.notes.length) {
+                checkAnswer();
+            }
         }
     }
 
@@ -555,6 +580,7 @@
         const slots = document.getElementById('answer-slots').children;
         for (let i = 0; i < slots.length; i++) {
             slots[i].innerText = state.userAnswer[i] || '';
+            // Assigning className like this safely overwrites any residual 'error' or 'success' classes
             slots[i].className = 'slot ' + (state.userAnswer[i] ? 'filled' : '');
         }
     }
@@ -613,7 +639,7 @@
             }
         } else {
             Array.from(slots).forEach(slot => slot.className = 'slot error');
-            document.getElementById('feedback').innerText = "Incorrect order. Click 'Clear Entry' and try again.";
+            document.getElementById('feedback').innerText = "Incorrect order. Deselect the last note or click 'Clear Entry' to try again.";
             document.getElementById('feedback').style.color = 'var(--danger)';
             if (state.firstAttempt) {
                 state.incorrect++;
@@ -642,23 +668,19 @@
 
     // --- The Bulletproof Clear Answer Fix ---
     window.clearAnswer = function() {
-        // 1. Reset user state array
         state.userAnswer = [];
         
-        // 2. Explicitly clear all styling and text from the visual slots
         const slots = document.querySelectorAll('.slot');
         slots.forEach(slot => {
             slot.innerText = '';
-            slot.className = 'slot'; // completely removes 'error' or 'filled' classes
+            slot.className = 'slot'; 
         });
         
-        // 3. Re-enable the note buttons explicitly using querySelectorAll 
         const noteBtns = document.querySelectorAll('.note-btn');
         noteBtns.forEach(btn => {
-            btn.disabled = false;
+            btn.classList.remove('selected');
         });
         
-        // 4. Wipe any existing feedback messages
         document.getElementById('feedback').innerText = '';
     }
 
